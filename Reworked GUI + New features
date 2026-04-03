@@ -5,8 +5,15 @@ local Window = Rayfield:CreateWindow({
    LoadingTitle = "Toxic's Immortality GUI",
    LoadingSubtitle = "v2.0 | Reworked",
    ConfigurationSaving = { Enabled = true, FolderName = "ToxicHub_CI", FileName = "MainConfig" },
-   Theme = "Amethyst" -- Changed theme to Amethyst for a purple look
+   Theme = "Amethyst"
 })
+
+-- GUI FIX: Forces the GUI to layer correctly and keep cursor visible
+local RayfieldGui = game:GetService("CoreGui"):FindFirstChild("Rayfield")
+if RayfieldGui then
+    RayfieldGui.IgnoreGuiInset = true -- Fixes layering so cursor interacts correctly
+    RayfieldGui.ResetOnSpawn = false  -- Keeps GUI persistent
+end
 
 -- Services
 local Players = game:GetService("Players")
