@@ -1,0 +1,316 @@
+-- COMBINED GUI: AUTO REINCARNATE + AUTO FORAGE + AFK BUTTON
+
+-- 1. Services & Variables
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager") -- Service for AFK
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+-- Remotes
+local ReincarnateRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Clicked")
+
+-- 2. AUTO FORAGE LOGIC --
+local AUTO_COLLECT_ENABLED = false
+local TELEPORT_HEIGHT = 4
+local DELAY_BETWEEN_COLLECTS = 1.9
+
+local collectibles = {
+    "Azure Serpent Grass", "Basic Herb", "Bitter Jade Grass", "Black Iron Root",
+    "Blue Wave Coral Herb", "Cloud Mist Herb", "Common Spirit Grass",
+    "Crimson Flame Mushroom", "Dandelion of Qi", "Healing Sunflower",
+    "Heavenly Spirit Vine", "Ironbone Grass", "Moonlight Jade Leaf",
+    "Mountain Green Herb", "Nine Suns Flame Grass", "Purple Lightning Orchid",
+    "Red Ginseng", "Seven Star Flower", "Silverleaf Herb", "Spirit Spring Herb",
+    "Starlight Dew Herb", "Thousand Year Lotus", "Wild Bitter Grass", "Wild Spirit Grass",
+    "Chest"
+}
+
+local collectSet = {}
+for _, name in collectibles do collectSet[name] = true end
+
+local function getTargetPart(item)
+    return item:IsA("BasePart") and item or item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
+end
+
+local function getDistance(obj)
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root or not obj then return math.huge end
+    local part = getTargetPart(obj)
+    return part and (root.Position - part.Position).Magnitude or math.huge
+end
+
+local function collectItem(item)
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local targetPart = getTargetPart(item)
+    local prompt = item:FindFirstChild("ProximityPrompt", true)
+
+    if targetPart and prompt then
+        local oldCFrame = root.CFrame
+        
+        root.CFrame = targetPart.CFrame * CFrame.new(0, TELEPORT_HEIGHT, 0)
+        task.wait(0.2) 
+
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration + 0.1)
+        prompt:InputHoldEnd()
+
+        task.wait(0.1)
+        root.CFrame = oldCFrame
+    end
+end
+
+local function scanAndCollect()
+    while true do
+        if AUTO_COLLECT_ENABLED then
+            local items = {}
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if collectSet[obj.Name] and getTargetPart(obj) then
+                    table.insert(items, obj)
+                end
+            end
+
+            table.sort(items, function(a, b)
+                return getDistance(a) < getDistance(b)
+            end)
+
+            if #items > 0 then
+                collectItem(items[1])
+                task.wait(DELAY_BETWEEN_COLLECTS)
+            else
+                task.wait(1.5)
+            end
+        else
+            task.wait(1)
+        end
+    end
+end
+
+task.spawn(scanAndCollect)
+
+-- 3. AFK LOGIC --
+local AFK_ENABLED = false
+
+local function afkLoop()
+    while true do
+        if AFK_ENABLED then
+            -- Simulate pressing Spacebar (Key Code 32)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, nil)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, nil)
+        end
+        task.wait(3) -- Press key every 3 seconds
+    end
+end
+
+task.spawn(afkLoop)
+
+-- 4. GUI CREATION --
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AutoFarmGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 250, 0, 240) -- Increased height for new button
+mainFrame.Position = UDim2.new(0.5, -125, 0.5, -120)
+mainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(0, 8)
+uiCorner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundTransparency = 1
+title.Text = "Auto Farm Control"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 18
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
+
+local targetBox = Instance.new("TextBox")
+targetBox.Name = "TargetInput"
+targetBox.Size = UDim2.new(0.9, 0, 0, 35)
+targetBox.Position = UDim2.new(0.05, 0, 0, 40)
+targetBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+targetBox.PlaceholderText = "Enter Target Total"
+targetBox.Text = "10"
+targetBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+targetBox.TextSize = 14
+targetBox.Font = Enum.Font.Gotham
+targetBox.Parent = mainFrame
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.CornerRadius = UDim.new(0, 4)
+boxCorner.Parent = targetBox
+
+-- AFK Button (New)
+local afkButton = Instance.new("TextButton")
+afkButton.Name = "AfkButton"
+afkButton.Size = UDim2.new(0.9, 0, 0, 35)
+afkButton.Position = UDim2.new(0.05, 0, 0, 85)
+afkButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100) -- Grey
+afkButton.Text = "AFK: OFF"
+afkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+afkButton.TextSize = 16
+afkButton.Font = Enum.Font.GothamBold
+afkButton.Parent = mainFrame
+
+local afkCorner = Instance.new("UICorner")
+afkCorner.CornerRadius = UDim.new(0, 4)
+afkCorner.Parent = afkButton
+
+local forageButton = Instance.new("TextButton")
+forageButton.Name = "ForageButton"
+forageButton.Size = UDim2.new(0.9, 0, 0, 35)
+forageButton.Position = UDim2.new(0.05, 0, 0, 130)
+forageButton.BackgroundColor3 = Color3.fromRGB(170, 85, 0)
+forageButton.Text = "FORAGE: OFF"
+forageButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+forageButton.TextSize = 16
+forageButton.Font = Enum.Font.GothamBold
+forageButton.Parent = mainFrame
+
+local forageCorner = Instance.new("UICorner")
+forageCorner.CornerRadius = UDim.new(0, 4)
+forageCorner.Parent = forageButton
+
+local startButton = Instance.new("TextButton")
+startButton.Name = "StartButton"
+startButton.Size = UDim2.new(0.9, 0, 0, 40)
+startButton.Position = UDim2.new(0.05, 0, 0, 175) -- Moved down
+startButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+startButton.Text = "REINCARNATE: OFF"
+startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+startButton.TextSize = 16
+startButton.Font = Enum.Font.GothamBold
+startButton.Parent = mainFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 4)
+btnCorner.Parent = startButton
+
+-- 5. LOGIC FUNCTIONS --
+
+local function getCurrentTotal()
+	local success, result = pcall(function()
+		local screenGui = PlayerGui:FindFirstChild("ScreenGui", true)
+		if not screenGui then return nil end
+		local follower = screenGui:FindFirstChild("Follower", true)
+		if not follower then return nil end
+		local stats = follower:FindFirstChild("PlayerStats", true)
+		if not stats then return nil end
+		local totalLabel = stats:FindFirstChild("Total", true)
+		if totalLabel and totalLabel:IsA("TextLabel") then
+			return totalLabel.Text
+		end
+		return nil
+	end)
+
+	if success and result then
+		local number = string.match(result, "[%d%.]+")
+		if number then return tonumber(number) end
+	end
+	return 0
+end
+
+-- Exact Path Clicking
+local function clickGameReincarnateButton()
+    local screen = PlayerGui:FindFirstChild("ScreenGui")
+    if not screen then return false end
+    
+    local cutscenes = screen:FindFirstChild("Cutscenes")
+    if not cutscenes then return false end
+    
+    local death = cutscenes:FindFirstChild("Death")
+    if not death then return false end
+    
+    local void = death:FindFirstChild("Void")
+    if not void then return false end
+    
+    local btn = void:FindFirstChild("Reincarnate")
+    if btn then
+        firesignal(btn.MouseButton1Click)
+        return true
+    end
+    
+    return false
+end
+
+-- Button Connections
+afkButton.MouseButton1Click:Connect(function()
+    AFK_ENABLED = not AFK_ENABLED
+    if AFK_ENABLED then
+        afkButton.Text = "AFK: ON"
+        afkButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+    else
+        afkButton.Text = "AFK: OFF"
+        afkButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    end
+end)
+
+forageButton.MouseButton1Click:Connect(function()
+    AUTO_COLLECT_ENABLED = not AUTO_COLLECT_ENABLED
+    if AUTO_COLLECT_ENABLED then
+        forageButton.Text = "FORAGE: ON"
+        forageButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+    else
+        forageButton.Text = "FORAGE: OFF"
+        forageButton.BackgroundColor3 = Color3.fromRGB(170, 85, 0)
+    end
+end)
+
+local isRunning = false
+
+local function startFarmLoop()
+    if isRunning then 
+        isRunning = false
+        startButton.Text = "REINCARNATE: OFF"
+        startButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+        return 
+    end
+    
+    isRunning = true
+    startButton.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
+    
+    local target = tonumber(targetBox.Text) or 10
+    local lastUpdate = 0
+
+    while isRunning do
+        local currentTotal = getCurrentTotal()
+        
+        if currentTotal >= target then
+            print("✅ SUCCESS! Total reached: " .. currentTotal)
+            break
+        end
+        
+        if tick() - lastUpdate > 1 then
+            startButton.Text = "Farming... ("..currentTotal.."/"..target..")"
+            lastUpdate = tick()
+        end
+        
+        clickGameReincarnateButton()
+        
+        local args = { "Reincarnate", false }
+        ReincarnateRemote:FireServer(unpack(args))
+        
+        task.wait(2)
+    end
+    
+    isRunning = false
+    startButton.Text = "REINCARNATE: OFF"
+    startButton.BackgroundColor3 = Color3.fromRGB(0, 170, 127)
+end
+
+startButton.MouseButton1Click:Connect(startFarmLoop)
