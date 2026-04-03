@@ -1,0 +1,399 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Toxic's Immortality GUI",
+   LoadingTitle = "Toxic's Immortality GUI",
+   LoadingSubtitle = "v2.0 | Reworked",
+   ConfigurationSaving = { Enabled = true, FolderName = "ToxicHub_CI", FileName = "MainConfig" },
+   Theme = "Amethyst" -- Changed theme to Amethyst for a purple look
+})
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local Remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Clicked")
+
+-- Global States
+local States = {
+    WalkSpeed = 16,
+    Noclip = false,
+    Flying = false,
+    FlySpeed = 50,
+    VisualsESP = false,
+    AutoRepeat = false,
+    AutoStory = false,
+    AutoUpgrade = false,
+    AutoCultivate = false,
+    AutoQuests = false,
+    AutoReincarnate = false,
+    AutoForage = false,
+    AFK = false
+}
+
+-- Tabs
+local MainTab = Window:CreateTab("Automation", 4483362458)
+local QuestTab = Window:CreateTab("Quests", 4483362458)
+local MoveTab = Window:CreateTab("Movement", 4483362458)
+local VisualTab = Window:CreateTab("Visuals", 4483362458)
+
+--- MOVEMENT SECTION ---
+MoveTab:CreateSection("Character Physics")
+
+MoveTab:CreateSlider({
+   Name = "WalkSpeed",
+   Range = {16, 500},
+   Increment = 1,
+   CurrentValue = 16,
+   Flag = "WS_Slider",
+   Callback = function(Value) States.WalkSpeed = Value end,
+})
+
+MoveTab:CreateToggle({
+   Name = "Noclip",
+   CurrentValue = false,
+   Flag = "NoclipToggle",
+   Callback = function(Value) States.Noclip = Value end,
+})
+
+MoveTab:CreateSection("Flight System")
+
+MoveTab:CreateToggle({
+   Name = "Fly Mode",
+   CurrentValue = false,
+   Flag = "FlyToggle",
+   Callback = function(Value)
+       States.Flying = Value
+       local char = Player.Character
+       if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+       
+       if Value then
+           local BV = Instance.new("BodyVelocity")
+           local BG = Instance.new("BodyGyro")
+           
+           BV.Name = "Flight_Velocity"
+           BV.Parent = char.HumanoidRootPart
+           BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+           BV.Velocity = Vector3.new(0, 0, 0)
+           
+           BG.Name = "Flight_Gyro"
+           BG.Parent = char.HumanoidRootPart
+           BG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+           BG.P = 90000
+           BG.CFrame = char.HumanoidRootPart.CFrame
+       else
+           if char.HumanoidRootPart:FindFirstChild("Flight_Velocity") then char.HumanoidRootPart.Flight_Velocity:Destroy() end
+           if char.HumanoidRootPart:FindFirstChild("Flight_Gyro") then char.HumanoidRootPart.Flight_Gyro:Destroy() end
+           if char:FindFirstChild("Humanoid") then char.Humanoid.PlatformStand = false end
+       end
+   end,
+})
+
+MoveTab:CreateSlider({
+   Name = "Fly Speed",
+   Range = {10, 500},
+   Increment = 5,
+   CurrentValue = 50,
+   Flag = "FlySpeed",
+   Callback = function(Value) States.FlySpeed = Value end,
+})
+
+--- AFK SECTION ---
+MoveTab:CreateSection("Anti-AFK")
+
+MoveTab:CreateToggle({
+   Name = "Anti-AFK (Virtual Input)",
+   CurrentValue = false,
+   Flag = "AFKToggle",
+   Callback = function(Value)
+       States.AFK = Value
+   end,
+})
+
+task.spawn(function()
+    while true do
+        if States.AFK then
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, nil)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, nil)
+        end
+        task.wait(3)
+    end
+end)
+
+-- Master Physics Loop
+RunService.RenderStepped:Connect(function()
+    local char = Player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = char.HumanoidRootPart
+    local hum = char:FindFirstChildOfClass("Humanoid")
+
+    if hum then hum.WalkSpeed = States.WalkSpeed end
+
+    if States.Noclip or States.Flying then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end
+
+    if States.Flying then
+        local BV = hrp:FindFirstChild("Flight_Velocity")
+        local BG = hrp:FindFirstChild("Flight_Gyro")
+        
+        if BV and BG then
+            hum.PlatformStand = true
+            local camera = workspace.CurrentCamera
+            local moveDir = Vector3.new(0,0,0)
+
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
+
+            BG.CFrame = camera.CFrame
+            BV.Velocity = moveDir * States.FlySpeed
+        end
+    end
+end)
+
+--- VISUALS SECTION ---
+VisualTab:CreateToggle({
+   Name = "Universal ESP",
+   CurrentValue = false,
+   Flag = "ESPToggle",
+   Callback = function(Value)
+      States.VisualsESP = Value
+      if not Value then
+          for _, v in pairs(game.Workspace:GetDescendants()) do
+              if v:IsA("Highlight") and v.Name == "VisualsESP" then v:Destroy() end
+          end
+      end
+   end,
+})
+
+task.spawn(function()
+    while task.wait(2) do
+        if States.VisualsESP then
+            for _, v in pairs(game.Workspace:GetDescendants()) do
+                if v:IsA("ProximityPrompt") or v.Name == "Collect" or v.Name == "ClickDetector" then
+                    local target = v.Parent
+                    if (target:IsA("Model") or target:IsA("BasePart")) and not target:FindFirstChild("VisualsESP") then
+                        local h = Instance.new("Highlight")
+                        h.Name = "VisualsESP"
+                        h.FillColor = Color3.fromRGB(0, 255, 150)
+                        h.Parent = target
+                    end
+                end
+            end
+        end
+    end
+end)
+
+--- AUTOMATION TAB ---
+local function BruteForce(toggleName, remotePrefix)
+    task.spawn(function()
+        while States[toggleName] do
+            for i = 1, 100 do
+                if not States[toggleName] then break end
+                Remote:FireServer(remotePrefix .. "_" .. tostring(i), true)
+            end
+            task.wait(0.1)
+        end
+    end)
+end
+
+MainTab:CreateSection("General Automation")
+MainTab:CreateToggle({Name = "Auto Repeatables", CurrentValue = false, Callback = function(v) States.AutoRepeat = v if v then BruteForce("AutoRepeat", "Repeatable") end end})
+MainTab:CreateToggle({Name = "Auto Story", CurrentValue = false, Callback = function(v) States.AutoStory = v if v then BruteForce("AutoStory", "Special") end end})
+MainTab:CreateToggle({Name = "Auto Upgrades", CurrentValue = false, Callback = function(v) States.AutoUpgrade = v if v then BruteForce("AutoUpgrade", "Upgrade") end end})
+MainTab:CreateToggle({Name = "Auto Cultivate", CurrentValue = false, Callback = function(v) States.AutoCultivate = v task.spawn(function() while States.AutoCultivate do Remote:FireServer("Cultivate", false) task.wait(0.1) end end) end})
+
+--- FARMING SECTION (Reincarnation & Forage) ---
+MainTab:CreateSection("Farming & Reincarnation")
+
+local ReincarnateTarget = 10
+local TELEPORT_HEIGHT = 4
+local DELAY_BETWEEN_COLLECTS = 1.9
+
+local collectibles = {
+    "Azure Serpent Grass", "Basic Herb", "Bitter Jade Grass", "Black Iron Root",
+    "Blue Wave Coral Herb", "Cloud Mist Herb", "Common Spirit Grass",
+    "Crimson Flame Mushroom", "Dandelion of Qi", "Healing Sunflower",
+    "Heavenly Spirit Vine", "Ironbone Grass", "Moonlight Jade Leaf",
+    "Mountain Green Herb", "Nine Suns Flame Grass", "Purple Lightning Orchid",
+    "Red Ginseng", "Seven Star Flower", "Silverleaf Herb", "Spirit Spring Herb",
+    "Starlight Dew Herb", "Thousand Year Lotus", "Wild Bitter Grass", "Wild Spirit Grass",
+    "Chest"
+}
+
+local collectSet = {}
+for _, name in collectibles do collectSet[name] = true end
+
+local function getTargetPart(item)
+    return item:IsA("BasePart") and item or item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
+end
+
+local function getDistance(obj)
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root or not obj then return math.huge end
+    local part = getTargetPart(obj)
+    return part and (root.Position - part.Position).Magnitude or math.huge
+end
+
+local function collectItem(item)
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local targetPart = getTargetPart(item)
+    local prompt = item:FindFirstChild("ProximityPrompt", true)
+
+    if targetPart and prompt then
+        local oldCFrame = root.CFrame
+        root.CFrame = targetPart.CFrame * CFrame.new(0, TELEPORT_HEIGHT, 0)
+        task.wait(0.2) 
+
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration + 0.1)
+        prompt:InputHoldEnd()
+
+        task.wait(0.1)
+        root.CFrame = oldCFrame
+    end
+end
+
+local function getCurrentTotal()
+    local success, result = pcall(function()
+        local screenGui = PlayerGui:FindFirstChild("ScreenGui", true)
+        if not screenGui then return nil end
+        local follower = screenGui:FindFirstChild("Follower", true)
+        if not follower then return nil end
+        local stats = follower:FindFirstChild("PlayerStats", true)
+        if not stats then return nil end
+        local totalLabel = stats:FindFirstChild("Total", true)
+        if totalLabel and totalLabel:IsA("TextLabel") then
+            return totalLabel.Text
+        end
+        return nil
+    end)
+
+    if success and result then
+        local number = string.match(result, "[%d%.]+")
+        if number then return tonumber(number) end
+    end
+    return 0
+end
+
+local function clickGameReincarnateButton()
+    local screen = PlayerGui:FindFirstChild("ScreenGui")
+    if not screen then return false end
+    local cutscenes = screen:FindFirstChild("Cutscenes")
+    if not cutscenes then return false end
+    local death = cutscenes:FindFirstChild("Death")
+    if not death then return false end
+    local void = death:FindFirstChild("Void")
+    if not void then return false end
+    local btn = void:FindFirstChild("Reincarnate")
+    if btn then
+        firesignal(btn.MouseButton1Click)
+        return true
+    end
+    return false
+end
+
+MainTab:CreateInput({
+    Name = "Reincarnate Target",
+    CurrentValue = "10",
+    PlaceholderText = "Target Total",
+    Flag = "ReincarnateTargetInput",
+    Callback = function(Text)
+        ReincarnateTarget = tonumber(Text) or 10
+    end,
+})
+
+MainTab:CreateToggle({
+    Name = "Auto Reincarnate",
+    CurrentValue = false,
+    Flag = "AutoReincarnateToggle",
+    Callback = function(Value)
+        States.AutoReincarnate = Value
+        if Value then
+            task.spawn(function()
+                while States.AutoReincarnate do
+                    local currentTotal = getCurrentTotal()
+                    if currentTotal >= ReincarnateTarget then
+                        Rayfield:Notify({Title = "Success", Content = "Target reached: "..currentTotal, Image = 4483362458})
+                        break
+                    end
+                    
+                    clickGameReincarnateButton()
+                    Remote:FireServer("Reincarnate", false)
+                    task.wait(2)
+                end
+            end)
+        end
+    end,
+})
+
+MainTab:CreateToggle({
+   Name = "Auto Forage",
+   CurrentValue = false,
+   Flag = "AutoForageToggle",
+   Callback = function(Value)
+      States.AutoForage = Value
+      if Value then
+          task.spawn(function()
+              while States.AutoForage do
+                  local items = {}
+                  for _, obj in ipairs(Workspace:GetDescendants()) do
+                      if collectSet[obj.Name] and getTargetPart(obj) then
+                          table.insert(items, obj)
+                      end
+                  end
+
+                  table.sort(items, function(a, b)
+                      return getDistance(a) < getDistance(b)
+                  end)
+
+                  if #items > 0 then
+                      collectItem(items[1])
+                      task.wait(DELAY_BETWEEN_COLLECTS)
+                  else
+                      task.wait(1.5)
+                  end
+              end
+          end)
+      end
+   end,
+})
+
+--- QUESTS TAB ---
+QuestTab:CreateToggle({
+   Name = "Auto Move Quests (1-100)",
+   CurrentValue = false,
+   Callback = function(Value)
+      States.AutoQuests = Value
+      if Value then
+          task.spawn(function()
+              while States.AutoQuests do
+                  for i = 1, 100 do
+                      if not States.AutoQuests then break end
+                      Remote:FireServer("ServerQuest", false, "Move", tostring(i))
+                  end
+                  task.wait(0.2) 
+              end
+          end)
+      end
+   end,
+})
+
+Rayfield:LoadConfiguration()
